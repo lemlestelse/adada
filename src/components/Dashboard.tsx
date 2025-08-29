@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { CreateUserModal } from './CreateUserModal';
+import { useUsers } from '../hooks/useUsers';
 import { 
   User,
   ProcessingSession,
@@ -31,6 +33,7 @@ import {
   TrendingUp,
   AlertTriangle
 } from 'lucide-react';
+import { Trash2, UserPlus, Edit3 } from 'lucide-react';
 
 interface ProcessingResult {
   input: string;
@@ -55,6 +58,8 @@ export function Dashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [progress, setProgress] = useState(0);
   const [currentItem, setCurrentItem] = useState('');
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const { users: mongoUsers, loading: usersLoading, fetchUsers, updateUser: updateMongoUser, deleteUser: deleteMongoUser } = useUsers();
 
   useEffect(() => {
     if (user) {
@@ -570,6 +575,7 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
 
   const tabs = [
     { key: 'users', label: 'Usuários', icon: Users },
+    { key: 'create', label: 'Criar Usuário', icon: UserPlus },
     { key: 'bans', label: 'IPs Banidos', icon: Shield },
     { key: 'attempts', label: 'Log de Login', icon: Activity }
   ];
@@ -613,66 +619,118 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
         <div className="p-6">
           {activeTab === 'users' && (
             <div className="space-y-6">
-              <div className="overflow-hidden rounded-xl border border-purple-500/20 bg-gray-800/30">
-                <table className="w-full">
-                  <thead className="bg-gray-800/50">
-                    <tr>
-                      <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Email</th>
-                      <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Função</th>
-                      <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Dias</th>
-                      <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Status</th>
-                      <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-purple-500/10">
-                    {users.map(user => (
-                      <tr key={user.id} className="hover:bg-gray-800/30 transition-colors">
-                        <td className="text-white py-4 px-6 font-medium">{user.email}</td>
-                        <td className="text-gray-300 py-4 px-6 text-sm">
-                          <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-lg text-xs font-medium border border-purple-500/30">
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="text-white py-4 px-6 font-mono text-sm font-bold">{user.subscription_days}</td>
-                        <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-lg text-xs font-medium border ${
-                            user.is_banned 
-                              ? 'bg-red-500/20 text-red-300 border-red-500/30' 
-                              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                          }`}>
-                            {user.is_banned ? 'Banido' : 'Ativo'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex gap-2">
-                            {user.is_banned ? (
-                              <button
-                                onClick={() => unbanUser(user.id)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
-                              >
-                                Desbanir
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => banUser(user.id)}
-                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
-                              >
-                                Banir
-                              </button>
-                            )}
-                            <button
-                              onClick={() => extendSubscription(user.id, 30)}
-                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1 shadow-lg"
-                            >
-                              <Plus className="w-3 h-3" />
-                              30d
-                            </button>
-                          </div>
-                        </td>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                  <span className="ml-3 text-purple-300">Carregando usuários...</span>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-purple-500/20 bg-gray-800/30">
+                  <table className="w-full">
+                    <thead className="bg-gray-800/50">
+                      <tr>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Nome</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Email</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Função</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Dias</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Status</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Criado em</th>
+                        <th className="text-left text-purple-300 font-semibold py-4 px-6 text-sm">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-purple-500/10">
+                      {mongoUsers.map(user => (
+                        <tr key={user._id} className="hover:bg-gray-800/30 transition-colors">
+                          <td className="text-white py-4 px-6 font-medium">{user.name}</td>
+                          <td className="text-gray-300 py-4 px-6 text-sm font-mono">{user.email}</td>
+                          <td className="text-gray-300 py-4 px-6 text-sm">
+                            <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-lg text-xs font-medium border border-purple-500/30">
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="text-white py-4 px-6 font-mono text-sm font-bold">{user.subscription_days}</td>
+                          <td className="py-4 px-6">
+                            <span className={`px-3 py-1 rounded-lg text-xs font-medium border ${
+                              user.is_banned 
+                                ? 'bg-red-500/20 text-red-300 border-red-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            }`}>
+                              {user.is_banned ? 'Banido' : 'Ativo'}
+                            </span>
+                          </td>
+                          <td className="text-gray-300 py-4 px-6 text-sm">
+                            {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex gap-2">
+                              {user.is_banned ? (
+                                <button
+                                  onClick={async () => {
+                                    await updateMongoUser(user._id, { is_banned: false });
+                                  }}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
+                                >
+                                  Desbanir
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={async () => {
+                                    await updateMongoUser(user._id, { is_banned: true });
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
+                                >
+                                  Banir
+                                </button>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  await updateMongoUser(user._id, { 
+                                    subscription_days: user.subscription_days + 30 
+                                  });
+                                }}
+                                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1 shadow-lg"
+                              >
+                                <Plus className="w-3 h-3" />
+                                30d
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Tem certeza que deseja excluir este usuário?')) {
+                                    await deleteMongoUser(user._id);
+                                  }
+                                }}
+                                className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'create' && (
+            <div className="space-y-6">
+              <div className="bg-gray-800/30 rounded-xl border border-purple-500/20 p-8 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center mx-auto mb-6">
+                  <UserPlus className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-4">Criar Novo Usuário</h3>
+                <p className="text-gray-300 mb-6">
+                  Adicione novos usuários ao sistema com configurações personalizadas de acesso e assinatura.
+                </p>
+                <button
+                  onClick={() => setShowCreateUser(true)}
+                  className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 mx-auto"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  Abrir Formulário
+                </button>
               </div>
             </div>
           )}
@@ -763,6 +821,16 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Create User Modal */}
+      <CreateUserModal
+        isOpen={showCreateUser}
+        onClose={() => setShowCreateUser(false)}
+        onUserCreated={() => {
+          fetchUsers();
+          addNotification('success', 'Usuário criado com sucesso!');
+        }}
+      />
     </div>
   );
 }
