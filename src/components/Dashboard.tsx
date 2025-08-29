@@ -535,42 +535,25 @@ export function Dashboard() {
 }
 
 function AdminPanel({ onClose }: { onClose: () => void }) {
-  const [users, setUsers] = useState<User[]>([]);
+  const { users: mongoUsers, loading: usersLoading, fetchUsers, updateUser: updateMongoUser, deleteUser: deleteMongoUser } = useUsers();
   const [bannedIPs, setBannedIPs] = useState<any[]>([]);
   const [loginAttempts, setLoginAttempts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'users' | 'bans' | 'attempts'>('users');
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
-    loadAdminData();
+    fetchUsers();
+    loadSecurityData();
   }, []);
 
-  const loadAdminData = () => {
-    setUsers(getUsers());
+  const loadSecurityData = () => {
     setBannedIPs(getBannedIPs());
     setLoginAttempts(getLoginAttempts().slice(-50));
   };
 
-  const banUser = (userId: string) => {
-    updateUser(userId, { is_banned: true });
-    loadAdminData();
-  };
-
-  const unbanUser = (userId: string) => {
-    updateUser(userId, { is_banned: false });
-    loadAdminData();
-  };
-
-  const extendSubscription = (userId: string, days: number) => {
-    const user = users.find(u => u.id === userId);
-    if (user) {
-      updateUser(userId, { subscription_days: user.subscription_days + days });
-      loadAdminData();
-    }
-  };
-
   const banIP = (ipAddress: string) => {
     banIPStorage(ipAddress, 'Manually banned by admin', 24);
-    loadAdminData();
+    loadSecurityData();
   };
 
   const tabs = [
@@ -759,7 +742,7 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
                           <button
                             onClick={() => {
                               unbanIP(ban.id);
-                              loadAdminData();
+                              loadSecurityData();
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg"
                           >
@@ -828,7 +811,7 @@ function AdminPanel({ onClose }: { onClose: () => void }) {
         onClose={() => setShowCreateUser(false)}
         onUserCreated={() => {
           fetchUsers();
-          addNotification('success', 'Usuário criado com sucesso!');
+          setShowCreateUser(false);
         }}
       />
     </div>
